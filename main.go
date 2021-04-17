@@ -6,8 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
+	"os"
 
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
@@ -35,7 +35,8 @@ func main() {
 func StartTcpServer() {
 	lis, err := net.Listen("tcp", ":9108")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		fmt.Printf("failed to listen: %v", err)
+		os.Exit(1)
 	}
 
 	fmt.Println("server is wating ....")
@@ -43,6 +44,7 @@ func StartTcpServer() {
 		conn, err := lis.Accept()
 		if err != nil {
 			fmt.Println("connect failed ...")
+			continue
 		}
 		fmt.Println(conn.RemoteAddr(), "connect success !")
 
@@ -54,7 +56,8 @@ func StartTcpServer() {
 func StartRpcServer() {
 	lis, err := net.Listen("tcp", ":9109")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		fmt.Printf("failed to listen: %v", err)
+		os.Exit(1)
 	}
 
 	s := grpc.NewServer(grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
@@ -90,12 +93,16 @@ func ServeHandle(conn net.Conn) {
 
 		if err != nil {
 			if err == io.EOF {
-				// 链接已关闭
-				services.GetChatMgr().OnConnClosed(conn)
-				fmt.Println("conn closed")
-				break
+
+				continue
 			}
-			continue
+
+			// 链接已关闭
+			tcpConn := conn.(*net.TCPConn)
+			services.GetChatMgr().OnConnClosed(tcpConn)
+			fmt.Printf("%s conn closed\n", conn.RemoteAddr())
+			fmt.Printf("conn read err: %v\n", err)
+			break
 		}
 
 		if readLen == 0 {

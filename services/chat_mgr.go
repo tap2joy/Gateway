@@ -9,6 +9,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/tap2joy/Gateway/utils"
 	pb_common "github.com/tap2joy/Protocols/go/common"
@@ -35,15 +36,15 @@ func GetChatMgr() *ChatMgr {
 }
 
 type ChatMgr struct {
-	ChatServers []string             // 聊天服务器的地址
-	UsersConn   map[string]*net.Conn // 玩家名字与链接映射
-	Conn2User   map[*net.Conn]string // 链接到用户映射
+	ChatServers []string                // 聊天服务器的地址
+	UsersConn   map[string]*net.TCPConn // 玩家名字与链接映射
+	Conn2User   map[string]string       // 链接到用户映射
 }
 
 func NewChatMgr() *ChatMgr {
 	mgr := &ChatMgr{
-		UsersConn: make(map[string]*net.Conn),
-		Conn2User: make(map[*net.Conn]string),
+		UsersConn: make(map[string]*net.TCPConn),
+		Conn2User: make(map[string]string),
 	}
 
 	mgr.RefreshChatService()
@@ -155,8 +156,9 @@ func (mgr *ChatMgr) UserLogin(name string, channelId uint32, conn *net.Conn) err
 		}
 	}
 
-	mgr.UsersConn[name] = conn
-	mgr.Conn2User[conn] = name
+	tcpConn := (*conn).(*net.TCPConn)
+	mgr.UsersConn[name] = tcpConn
+	mgr.Conn2User[ConnPointer2String(tcpConn)] = name
 	fmt.Printf("user %s login success\n", name)
 	return nil
 }
@@ -169,7 +171,8 @@ func (mgr *ChatMgr) UserLogout(name string) error {
 			return err
 		}
 
-		delete(mgr.Conn2User, mgr.UsersConn[name])
+		connStr := ConnPointer2String(mgr.UsersConn[name])
+		delete(mgr.Conn2User, connStr)
 		(*mgr.UsersConn[name]).Close()
 		delete(mgr.UsersConn, name)
 		fmt.Printf("user %s logout success\n", name)
@@ -179,8 +182,9 @@ func (mgr *ChatMgr) UserLogout(name string) error {
 }
 
 // 链接断开
-func (mgr *ChatMgr) OnConnClosed(conn net.Conn) {
-	if name, ok := mgr.Conn2User[&conn]; ok {
+func (mgr *ChatMgr) OnConnClosed(conn *net.TCPConn) {
+	connStr := ConnPointer2String(conn)
+	if name, ok := mgr.Conn2User[connStr]; ok {
 		fmt.Printf("user %s conn closed\n", name)
 		mgr.UserLogout(name)
 	}
@@ -191,7 +195,8 @@ func (mgr *ChatMgr) KickOutUser(name string, gateAddress string) error {
 	localAddress := utils.GetLocalAddress()
 	if gateAddress == localAddress {
 		if _, ok := mgr.UsersConn[name]; ok {
-			delete(mgr.Conn2User, mgr.UsersConn[name])
+			connStr := ConnPointer2String(mgr.UsersConn[name])
+			delete(mgr.Conn2User, connStr)
 			(*mgr.UsersConn[name]).Close()
 			delete(mgr.UsersConn, name)
 			fmt.Printf("kick out user %s success\n", name)
@@ -272,4 +277,9 @@ func (mgr *ChatMgr) GetChannelList() (*pb_chat.GetChannelListResponse, error) {
 	}
 
 	return resp, nil
+}
+
+func ConnPointer2String(conn *net.TCPConn) string {
+	strPointerHex := fmt.Sprintf("%p", unsafe.Pointer(conn))
+	return strPointerHex
 }
