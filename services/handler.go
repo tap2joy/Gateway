@@ -8,6 +8,7 @@ import (
 
 	pb_common "github.com/tap2joy/Protocols/go/common"
 	pb "github.com/tap2joy/Protocols/go/gateway"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -21,6 +22,7 @@ func HandleUserLogin(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	err := GetChatMgr().UserLogin(name, channel, &conn)
 	if err != nil {
 		fmt.Printf("user login error %s\n", err.Error())
+		PushErrorMessage(conn, err)
 		return
 	}
 
@@ -48,6 +50,8 @@ func HandleUserLogout(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	err := GetChatMgr().UserLogout(name)
 	if err != nil {
 		fmt.Printf("user logout error %s\n", err.Error())
+		PushErrorMessage(conn, err)
+		return
 	}
 
 	// 回复登出成功消息
@@ -71,6 +75,8 @@ func HandleSendMessage(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 
 	result, err := GetChatMgr().SendMessage(packet.Channel, packet.SenderName, packet.Content)
 	if err != nil {
+		fmt.Printf("send message err: %v\n", err)
+		PushErrorMessage(conn, err)
 		return
 	}
 
@@ -95,6 +101,7 @@ func HandleGetChatLog(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	resp, err := GetChatMgr().GetChatLogs(packet.Channel)
 	if err != nil {
 		fmt.Printf("get chat log err: %v\n", err)
+		PushErrorMessage(conn, err)
 		return
 	}
 
@@ -123,6 +130,7 @@ func HandleChangeChannel(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	err := ChangeChannel(packet.Name, packet.Channel)
 	if err != nil {
 		fmt.Printf("user %s change channel failed, err: %v\n", packet.Name, err)
+		PushErrorMessage(conn, err)
 		return
 	}
 
@@ -158,6 +166,7 @@ func HandleGetChannelList(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	resp, err := GetChatMgr().GetChannelList()
 	if err != nil {
 		fmt.Printf("get channel list err: %v\n", err)
+		PushErrorMessage(conn, err)
 		return
 	}
 
@@ -176,6 +185,23 @@ func HandleGetChannelList(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	}
 
 	SendPacket(conn, pb_common.Mid_G2C_GET_CHANNEL_LIST, msgByte)
+}
+
+// 推送错误消息给客户端
+func PushErrorMessage(conn net.Conn, err error) {
+	status, _ := status.FromError(err)
+	respMsg := &pb_common.SErrorMessage{
+		Code: int32(status.Code()),
+		Msg:  status.Message(),
+	}
+
+	msgByte, err := proto.Marshal(respMsg)
+	if err != nil {
+		fmt.Printf("msg Marshal error %s\n", err.Error())
+		return
+	}
+
+	SendPacket(conn, pb_common.Mid_G2C_ERROR_MESSAGE, msgByte)
 }
 
 // 发送消息包
