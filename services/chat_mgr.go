@@ -205,6 +205,10 @@ func (mgr *ChatMgr) KickOutUser(name string, gateAddress string) error {
 	localAddress := utils.GetLocalAddress()
 	if gateAddress == localAddress {
 		if _, ok := mgr.UsersConn[name]; ok {
+			// 发一条顶号通知
+			userNames := []string{name}
+			mgr.PushMessage("system", "you are login in another place ...", uint64(time.Now().Unix()), userNames)
+
 			connStr := ConnPointer2String(mgr.UsersConn[name])
 			delete(mgr.Conn2User, connStr)
 			(*mgr.UsersConn[name]).Close()
