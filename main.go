@@ -19,6 +19,7 @@ import (
 
 	"github.com/tap2joy/Gateway/server"
 	"github.com/tap2joy/Gateway/services"
+	"github.com/tap2joy/Gateway/utils"
 	pb_common "github.com/tap2joy/Protocols/go/common"
 	pb "github.com/tap2joy/Protocols/go/grpc/gateway"
 )
@@ -28,7 +29,6 @@ func main() {
 	services.GetChatMgr().Init()
 
 	go StartTcpServer()
-
 	StartRpcServer()
 }
 
@@ -132,4 +132,21 @@ func ServeHandle(conn net.Conn) {
 	}
 
 	fmt.Println("conn end")
+}
+
+func InitService() {
+	// 注册服务
+	localAddress := utils.GetLocalAddress()
+	err := services.RegisterGatewayService(localAddress)
+	if err != nil {
+		fmt.Printf("register gateway service failed, err = %v\n", err)
+	} else {
+		fmt.Println("register gateway service success")
+
+		// 定时获取聊天服务列表，5秒一次
+		utils.StartTimer(5, "2021-01-01 19:14:30", "", func() {
+			services.GetChatServices()
+		})
+		select {}
+	}
 }

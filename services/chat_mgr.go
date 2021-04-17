@@ -46,19 +46,25 @@ func NewChatMgr() *ChatMgr {
 		Conn2User: make(map[*net.Conn]string),
 	}
 
+	mgr.RefreshChatService()
+	return mgr
+}
+
+// 刷新聊天服务列表
+func (mgr *ChatMgr) RefreshChatService() {
 	resp, err := GetChatServices()
 	if err != nil {
 		fmt.Printf("get chat service failed, err =%v\n", err)
 	} else {
 		fmt.Println("get chat service success")
 
+		mgr.ChatServers = make([]string, 0)
 		for _, v := range resp.List {
 			mgr.ChatServers = append(mgr.ChatServers, v)
 		}
 	}
 
 	fmt.Printf("%v\n", mgr.ChatServers)
-	return mgr
 }
 
 func (mgr *ChatMgr) Init() {

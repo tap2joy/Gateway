@@ -9,6 +9,28 @@ import (
 	"google.golang.org/grpc"
 )
 
+// 注册gateway到centerService
+func RegisterGatewayService(gateAddress string) error {
+	address := utils.GetString("grpc", "grpc_center_address")
+
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	c := protocols.NewCenterServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err = c.RegisterService(ctx, &protocols.RegisterServiceRequest{Type: "gateway", Address: gateAddress})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // 获取聊天服务列表
 func GetChatServices() (*protocols.GetServicesResponse, error) {
 	address := utils.GetString("grpc", "grpc_center_address")
