@@ -36,15 +36,17 @@ func GetChatMgr() *ChatMgr {
 }
 
 type ChatMgr struct {
-	ChatServers []string                // 聊天服务器的地址
-	UsersConn   map[string]*net.TCPConn // 玩家名字与链接映射
-	Conn2User   map[string]string       // 链接到用户映射
+	ChatServers  []string                // 聊天服务器列表
+	UsersConn    map[string]*net.TCPConn // 玩家名字与链接映射
+	Conn2User    map[string]string       // 链接到用户映射
+	UserChannels map[string]uint32       // 聊天频道映射
 }
 
 func NewChatMgr() *ChatMgr {
 	mgr := &ChatMgr{
-		UsersConn: make(map[string]*net.TCPConn),
-		Conn2User: make(map[string]string),
+		UsersConn:    make(map[string]*net.TCPConn),
+		Conn2User:    make(map[string]string),
+		UserChannels: make(map[string]uint32),
 	}
 
 	mgr.RefreshChatService()
@@ -104,12 +106,14 @@ func (mgr *ChatMgr) PushMessage(senderName string, content string, timestamp uin
 }
 
 // 发送聊天消息
-func (mgr *ChatMgr) SendMessage(channelId uint32, senderName string, content string) (string, error) {
+func (mgr *ChatMgr) SendMessage(channelId uint32, senderName string, content string, isSystem bool) (string, error) {
 	result := ""
-	_, ok := mgr.UsersConn[senderName]
-	if !ok {
-		fmt.Printf("user %s conn not exist\n", senderName)
-		return result, status.Errorf(codes.Internal, "conn not exist")
+	if !isSystem {
+		_, ok := mgr.UsersConn[senderName]
+		if !ok {
+			fmt.Printf("user %s conn not exist\n", senderName)
+			return result, status.Errorf(codes.Internal, "conn not exist")
+		}
 	}
 
 	chatServicesCount := len(mgr.ChatServers)
@@ -131,7 +135,7 @@ func (mgr *ChatMgr) SendMessage(channelId uint32, senderName string, content str
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	resp, err := c.SendMessage(ctx, &pb_chat.SendMessageRequest{Channel: channelId, SenderName: senderName, Content: content})
+	resp, err := c.SendMessage(ctx, &pb_chat.SendMessageRequest{Channel: channelId, SenderName: senderName, Content: content, System: isSystem})
 	if err != nil {
 		return result, err
 	}
@@ -156,6 +160,8 @@ func (mgr *ChatMgr) UserLogin(name string, channelId uint32, conn *net.Conn) err
 		}
 	}
 
+	mgr.UserChannels[name] = channelId
+
 	tcpConn := (*conn).(*net.TCPConn)
 	mgr.UsersConn[name] = tcpConn
 	mgr.Conn2User[ConnPointer2String(tcpConn)] = name
@@ -176,6 +182,10 @@ func (mgr *ChatMgr) UserLogout(name string) error {
 		(*mgr.UsersConn[name]).Close()
 		delete(mgr.UsersConn, name)
 		fmt.Printf("user %s logout success\n", name)
+
+		notifyMsg := fmt.Sprintf("user [%s] leave ...", name)
+		mgr.SendMessage(mgr.UserChannels[name], "system", notifyMsg, true)
+		delete(mgr.UserChannels, name)
 	}
 
 	return nil
@@ -277,6 +287,10 @@ func (mgr *ChatMgr) GetChannelList() (*pb_chat.GetChannelListResponse, error) {
 	}
 
 	return resp, nil
+}
+
+func (mgr *ChatMgr) ChangeChannel(name string, channelId uint32) {
+	mgr.UserChannels[name] = channelId
 }
 
 func ConnPointer2String(conn *net.TCPConn) string {

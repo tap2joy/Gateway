@@ -39,6 +39,9 @@ func HandleUserLogin(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	}
 
 	SendPacket(conn, pb_common.Mid_G2C_USER_LOGIN, msgByte)
+
+	notifyMsg := fmt.Sprintf("user [%s] enter room ...", name)
+	GetChatMgr().SendMessage(packet.Channel, "system", notifyMsg, true)
 }
 
 // 处理用户登出
@@ -73,7 +76,7 @@ func HandleSendMessage(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	packet := msg.(*pb.CSend)
 	fmt.Println("message handler mid:", mid, " body:", packet)
 
-	result, err := GetChatMgr().SendMessage(packet.Channel, packet.SenderName, packet.Content)
+	result, err := GetChatMgr().SendMessage(packet.Channel, packet.SenderName, packet.Content, false)
 	if err != nil {
 		fmt.Printf("send message err: %v\n", err)
 		PushErrorMessage(conn, err)
@@ -156,6 +159,8 @@ func HandleChangeChannel(conn net.Conn, mid pb_common.Mid, msg interface{}) {
 	}
 
 	SendPacket(conn, pb_common.Mid_G2C_CHANGE_CHANNEL, msgByte)
+
+	GetChatMgr().ChangeChannel(packet.Name, packet.Channel)
 }
 
 // 处理获取频道列表
