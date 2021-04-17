@@ -130,7 +130,7 @@ func ServeHandle(conn net.Conn) {
 
 			fmt.Printf("receive packet mid: %d, len: %d\n", mid, length)
 
-			services.HandleRawData(mid, length+8, packetBytes)
+			services.HandleRawData(conn, mid, length+8, packetBytes)
 		}
 		if err := scanner.Err(); err != nil {
 			fmt.Println("无效数据包")

@@ -225,6 +225,8 @@ func SendPacket(conn net.Conn, mid pb_common.Mid, msgByte []byte) {
 	if err != nil {
 		fmt.Printf("conn write failed, err = %v\n", err)
 	} else {
-		fmt.Printf("send packet mid: %d, len: %d, write length: %d\n", mid, length, n)
+		tcpConn := conn.(*net.TCPConn)
+		connStr := ConnPointer2String(tcpConn)
+		fmt.Printf("con: %s send packet mid: %d, len: %d, write length: %d\n", connStr, mid, length, n)
 	}
 }
