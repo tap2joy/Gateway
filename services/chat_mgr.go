@@ -91,7 +91,8 @@ func (mgr *ChatMgr) PushMessage(senderName string, content string, timestamp uin
 	buf := &bytes.Buffer{}
 	var head []byte
 	head = make([]byte, 8)
-	binary.BigEndian.PutUint32(head[0:4], uint32(bytes.Count(msgByte, nil)-1))
+	dataLen := uint32(len(msgByte)) //uint32(bytes.Count(msgByte, nil)-1)
+	binary.BigEndian.PutUint32(head[0:4], dataLen)
 	binary.BigEndian.PutUint32(head[4:8], uint32(pb_common.Mid_G2C_PUSH_MESSAGE))
 	buf.Write(head[:8])
 	buf.Write(msgByte)

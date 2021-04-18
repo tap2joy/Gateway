@@ -215,7 +215,8 @@ func SendPacket(conn net.Conn, mid pb_common.Mid, msgByte []byte) {
 	var head []byte
 	head = make([]byte, 8)
 
-	length := uint32(bytes.Count(msgByte, nil) - 1)
+	// length := uint32(bytes.Count(msgByte, nil) - 1)
+	length := uint32(len(msgByte))
 	binary.BigEndian.PutUint32(head[0:4], length)
 	binary.BigEndian.PutUint32(head[4:8], uint32(mid))
 	buf.Write(head[:8])
